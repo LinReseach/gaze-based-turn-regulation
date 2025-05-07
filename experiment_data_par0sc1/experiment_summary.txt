@@ -1,0 +1,4 @@
+Experiment Start Time: 2025-05-06 13:57:12.154474
+Experiment End Time: 2025-05-06 13:58:11.034336
+Total Duration: 58.88 seconds
+Total Frames Captured: 148

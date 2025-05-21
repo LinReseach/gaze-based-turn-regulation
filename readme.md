@@ -93,9 +93,11 @@ python3 main_loop_savedata_lightweight.py --ip=10.0.0.180  --cam_id=4 --snapshot
 
 run in the computer
 - `main_loop_savedata_lightweight.py`: Main interaction loop for the robot, save data usinhg a lightweight way
+- `main_loop_savedata_lightweight_v2.py`: Main interaction loop for the robot, save data usinhg a lightweight way, run `gaze_prediction_v2.py`
 - `config.py`: Configuration parameters
 - `aoi.py`: Area of Interest detection and coordinate transformations
 - `gaze_prediction.py`: Gaze prediction using L2CS-Net
+- `gaze_prediction_v2.py`: Gaze prediction using L2CS-Net, drawing gaze vectors before and after average smoothing, and put text of aoi, state detection.
 - `state_detection.py`: state detection logic
 - `pepper_connection.py`: Communication with the Pepper robot
 - `model.py`: L2CS neural network model definition

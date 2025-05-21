@@ -70,16 +70,11 @@ def prediction(transformations, model, frame):
     pitch_predicted = None
     yaw_predicted = None
 
-    #cap = cv2.VideoCapture(cam)
-
-    # Check if the webcam is opened correctly
-    #if not cap.isOpened():
-    #    raise IOError("Cannot open webcam")
-
     start_fps = time.time()
 
-    #faces = detector(frame)
     faces = detector(frame)
+    face_bbox = None
+    
     if faces is not None:
         for box, landmarks, score in faces:
             if score < .95:
@@ -95,14 +90,8 @@ def prediction(transformations, model, frame):
             bbox_width = x_max - x_min
             bbox_height = y_max - y_min
 
-            # x_min = max(0,x_min-int(0.2*bbox_height))
-            # y_min = max(0,y_min-int(0.2*bbox_width))
-            # x_max = x_max+int(0.2*bbox_height)
-            # y_max = y_max+int(0.2*bbox_width)
-            # bbox_width = x_max - x_min
-            # bbox_height = y_max - y_min
-
-            #put inside th for loop for eye tracking of all the faces in the frame (now it's just the bigger)
+            face_bbox = (x_min, y_min, bbox_width, bbox_height)
+            
             # Crop image
             img = frame[y_min:y_max, x_min:x_max]
             img = cv2.resize(img, (224, 224))
@@ -115,31 +104,79 @@ def prediction(transformations, model, frame):
             # gaze prediction
             gaze_yaw, gaze_pitch = model(img)
 
-            """ this can be processed all once outside the cicle"""
-            pitch_predicted = softmax(gaze_pitch) # this is not pitch but its actually yaw. We are leaving it as it is for coherence with other analysis
-            yaw_predicted = softmax(gaze_yaw) # # this is not yaw but its actually pitch. We are leaving it as it is for coherence with other analysis
+            pitch_predicted = softmax(gaze_pitch)
+            yaw_predicted = softmax(gaze_yaw)
 
             # Get continuous predictions in degrees.
             pitch_predicted = torch.sum(pitch_predicted.data[0] * idx_tensor) * 4 - 180
-            yaw_predicted = torch.sum(yaw_predicted.data[0] * idx_tensor) * 4 - 180 # compensation (remembner that this ios actually pitch)
+            yaw_predicted = torch.sum(yaw_predicted.data[0] * idx_tensor) * 4 - 180
 
             pitch_predicted = pitch_predicted.cpu().detach().numpy() * np.pi / 180.0
             yaw_predicted = yaw_predicted.cpu().detach().numpy() * np.pi / 180.0
 
-            draw_gaze(x_min, y_min, bbox_width, bbox_height, frame, (yaw_predicted, pitch_predicted),
-                      color=(0, 0, 255))
+            # Draw face bounding box
             cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
+            
         myFPS = 1.0 / (time.time() - start_fps)
         #cv2.putText(frame, 'FPS: {:.1f}'.format(myFPS), (10, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 255, 0), 1,
-                      #  cv2.LINE_AA)
+                   # cv2.LINE_AA)
 
-            #cv2.imshow("Demo", frame)
-            #if cv2.waitKey(1) & 0xFF == 27:
-            #    break
-            #success, frame = cap.read()
-            #cap.release()
-            #cv2.destroyAllWindows()
-        return frame, pitch_predicted, yaw_predicted
+    return frame, pitch_predicted, yaw_predicted, face_bbox
+
+def get_aoi_name(aoi):
+    if aoi == 'AOI 1':
+        return "face"
+    elif aoi == 'AOI 2':
+        return "tablet"
+    else:
+        return "elsewhere"
+
+# In your main processing loop
+# Assuming 'aoi' variable already contains the current AOI value
+
+    
+def draw_annotated_frame(frame, face_bbox, original_gaze, smoothed_gaze, aoi, reading_state, page_number):
+    """
+    Draw both original and smoothed gaze vectors on the frame along with AOI, reading state, and page number
+    
+    Args:
+        frame: The input frame
+        face_bbox: Tuple of (x_min, y_min, width, height) for face detection
+        original_gaze: Tuple of (pitch, yaw) for original gaze
+        smoothed_gaze: Tuple of (pitch, yaw) for smoothed gaze
+        aoi: Current area of interest
+        reading_state: Current reading state ("reading" or "not_reading")
+        page_number: Current page number
+    
+    Returns:
+        Annotated frame
+    """
+    # Draw original gaze with red color if available
+    if face_bbox is not None and original_gaze[0] is not None and original_gaze[1] is not None:
+        draw_gaze(face_bbox[0], face_bbox[1], face_bbox[2], face_bbox[3],
+                  frame, (original_gaze[1], original_gaze[0]), color=(0, 0, 255))  # Red color
+    
+    # Draw smoothed gaze with green color if available
+    if face_bbox is not None and smoothed_gaze[0] is not None and smoothed_gaze[1] is not None:
+        draw_gaze(face_bbox[0], face_bbox[1], face_bbox[2], face_bbox[3],
+                  frame, (smoothed_gaze[1], smoothed_gaze[0]), color=(0, 255, 0))  # Green color
+    
+    # Add text information to the frame
+    # AOI information
+
+    aoi_name = get_aoi_name(aoi)
+    cv2.putText(frame, f"AOI: {aoi_name}", (10, 50), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                1, (255, 255, 255), 1, cv2.LINE_AA)
+    
+    # Reading state
+    cv2.putText(frame, f"State: {reading_state}", (10, 80), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                1, (255, 255, 255), 1, cv2.LINE_AA)
+    
+    # Page number
+    cv2.putText(frame, f"Page: {page_number}", (10, 110), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                1, (255, 255, 255), 1, cv2.LINE_AA)
+    
+    return frame
         
 def get_transformations():
     """Create image transformations for gaze prediction"""
